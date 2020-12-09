@@ -1,0 +1,201 @@
+---
+title: "Boston Airbnb Project"
+author: "Haoyu Li"
+date: "12/7/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+library(tidyverse)
+library(grid)
+library(png)
+```
+
+## Project Overview
+  When holiday and vacation come, people would like to travel around the country more than usual. The way people choose their accommodations during vacation is no longer limited to hotel in recent years because of the rising company Airbnb. Airbnb provides accommodations for people that want to stay at a place that makes them feel like home when they travel. On Airbnb website, there are tons of hosts that provide different information regarding their places so that people can evaluate these information and choose the place that meet their requirements. For this project, we focus on predict the price of different places using information that are provided in our data. The project consists of those parts: data cleaning and exploratory data analysis, data modeling, and model checking.
+
+## 1.Data Introduction & Cleaning
+The data we use in this project included detailed information of hundreds of thousand Airbnb listing places in city of Boston and it also list out the neighbourhoods in which Airbnb listings are located. The detailed information includes You can view our data in the Appendix I-Data overview. 
+For the data cleaning part, the data we found from the website "http://insideairbnb.com/get-the-data.html" has already been cleaned up, so our work would focus on the correct format of the varialbes. Since the Airbnb price is our response variable, we checked "price" variable and transform into the numerical variable using "as.numerical()" function. You can see the details in Appendix-Data cleaning. Next, we perform exploratory data analysis.
+
+## 2.Exploratory data analysis
+After we cleaned our data, we looked into our dataset and picked up some variables we think will have affect on the price predicting value. Those are: bedrooms, accommodates, room_type, number_of_review. We also use neighbourhood as our groups to fit the multilevel model that we need to predit Airbnb price. The distribution of price is one of the most important data analysis we need to look at. Below the Figure 2 is the distribution of Airbnb price.
+
+```{r echo=FALSE,fig.height=3,fig.width=4,fig.align='center'}
+boston<-read.csv("Boston.csv")
+
+boston$price<-as.numeric(boston$price)
+
+boston<-boston%>%filter(price>0)
+
+ggplot(data=boston)+geom_histogram(mapping = aes(x=price),color="black",fill="steelblue",binwidth = 10)+labs(title = "Distribution of price",x="price",y="count")
+```
+
+Figure 2: Distribution of price
+
+We find that the distribution of price is skewed on both end sides, we might consider log transform the price and to use log price to improve the accuracy of our model. The distribution of log price is displayed in Appendix.
+
+## 3.Modeling & Methods
+
+### Model choices
+
+### Multilevel linear model with varying intercept
+$$price =  \alpha_{i} +\beta_1 x_{bedrooms} +\beta_2x_{accommodates}+\beta_3x_{numberofreviews}+ \beta_4x_{roomtype} $$
+
+### Multilevel negative binomial model with varying intercept and varying slopes
+$$log(price) =  \alpha_{i} +\beta_{1[i]} x_{bedrooms} +\beta_{2[i]}x_{accommodates}+ \beta_3x_{roomtype} $$
+Below is the posterior predictve model check from first model to second model.
+```{r echo=FALSE,fig.height=3,fig.width=4,fig.align='center'}
+img_model_fit_1<-readPNG("img_model_fit_1.png")
+grid.raster(img_model_fit_1)
+```
+
+```{r echo=FALSE,fig.height=3,fig.width=4,fig.align='center'}
+img_model_fit_2<-readPNG("img_model_fit_2.png")
+grid.raster(img_model_fit_2)
+```
+
+From the first model to second model, we improve our model by moving from multilevel linear model to multilevel possion/negative binomial model, which means we use log transformation to improve model accuracy, from the model check we can see a obvious model accuracy has improved.
+
+### Multilevel negative binomial model focus on one room type
+However, the problem with both models is that there are two modes there, it might be caused by an usual large number of one variable. When we look into the distriution of room types, we find that the numbers of each room type are pretty uneven, so we decide to focus on one room type, which is entire home/apt, then we fit our model.
+$$log(price) =  \alpha_{i} +\beta_{1[i]} x_{bedrooms} +\beta_{2[i]}x_{accommodates} $$
+
+Below is the posterior predictive model check and rootogram
+```{r echo=FALSE,fig.height=3,fig.width=4,fig.align='center'}
+img_pp_check_entire<-readPNG("img_pp_check_entire.png")
+grid.raster(img_pp_check_entire)
+```
+
+```{r echo=FALSE,fig.height=3,fig.width=4,fig.align='center'}
+img_rootogram<-readPNG("img_rootogram.png")
+grid.raster(img_rootogram)
+```
+
+## 4.Discussion
+### Assess result of improved model
+From the posterior check, we can see on the lower side, the accuracy of our model improves significantly, but one the higher side, we still have discrepancy between observed value and predict value. We can also see the same problem from our rootogram, there are still some data on the high end of range that our model does not capture.
+
+### Limitation
+One thing we might consider why our model has the problem that we mention above is to look at the distribution of the log price. On the high log price, the frequency is extremely high compared to lower log price. It makes our model hard to capture those values due to the unusual pattern in our response variable.
+
+### Further direction
+For our further research, we could look into how to deal with the unusual pattern in small proportion of Airbnb price, and we can also consider include more predictors to improve the accuracy of our model.  
+
+## Reference
+Data source: http://insideairbnb.com/get-the-data.html
+
+## Appendix
+### Part I:Data Cleaning
+```{r eval=FALSE, include=FALSE,echo=TRUE}
+boston<-read.csv("Boston.csv")
+
+boston$price<-as.numeric(boston$price)
+
+boston<-boston%>%filter(price>0)
+
+```
+
+## Part II:EDA
+### Distribution of Neibourhood
+```{r echo=FALSE}
+neighbourhood_boston<-boston%>%group_by(neighbourhood_cleansed)%>%summarise(number_of_neighbourhood=n())%>%arrange(desc(number_of_neighbourhood))
+
+neighbourhood_boston
+```
+
+```{r echo=FALSE}
+ggplot(data=neighbourhood_boston)+geom_bar(aes(x=neighbourhood_cleansed,weight=number_of_neighbourhood),fill="steelblue")+labs(title = "Distribution of neighbourhood",x="Neighbourhood",y="Frequency")+theme(axis.text.x = element_text(face="bold",size = 8,angle = 60,hjust = 1))
+```
+
+### Relationship between price and bedrooms
+```{r echo=FALSE}
+price_bedroom<-boston%>%dplyr::select(price,bedrooms)%>%drop_na()
+
+ggplot(data=price_bedroom)+geom_point(aes(x=bedrooms, y=price))+
+  geom_smooth(aes(x=bedrooms, y=price), formula = "y~x", method="lm", se=F)+
+  labs(title = "Bedrooms against price", x="bedrooms",y="price")
+```
+We can see a clear linear relationship between price and bedrooms
+
+### Relationship between price and accommodates
+The variable accommodates means the number of people an Airbnb place can hold.
+```{r echo=FALSE,fig.align='center'}
+price_accommodate<-boston%>%dplyr::select(price,accommodates)%>%drop_na()
+
+ggplot(data=price_accommodate)+geom_point(aes(x=accommodates, y=price))+
+  geom_smooth(aes(x=accommodates, y=price), formula = "y~x", method="lm", se=F)+
+  labs(title = "Accommodates against price", x="accommodates",y="price")
+```
+We can see a clear linear relationship between price and accommodates.
+
+### Relationship between price and number of reviews
+```{r echo=FALSE}
+price_number_review<-boston%>%dplyr::select(price,number_of_reviews)%>%drop_na()
+
+ggplot(data=price_number_review)+geom_point(aes(x=number_of_reviews, y=price))+
+  geom_smooth(aes(x=number_of_reviews, y=price), formula = "y~x", method="lm", se=F)+
+  labs(title = "Number of reviews against price", x="number of reviews",y="price")
+
+```
+We might be careful include number of reviews in our model since the relationship between number of reviews and price is not obvious compared to bedrooms and accommodates.
+
+### Average price in different room type
+```{r echo=FALSE}
+room_type_price<-boston%>%dplyr::select(room_type,price)%>%group_by(room_type)%>%summarise(avg_price=mean(price))
+
+ggplot(data=room_type_price)+geom_bar(aes(x=room_type, weight=avg_price, fill=room_type))+labs(title = "Average price in each room type",x="room type",y="Average price")
+```
+We can consider include room type as predictor in our model since we see different room type has relatively differenr average price.
+
+### Plot lienar model between price and review scores
+```{r echo=FALSE}
+review_score_price<-boston%>%dplyr::select(price,review_scores_rating)%>%drop_na()
+
+ggplot(data=review_score_price)+
+  geom_point(aes(x=review_scores_rating, y=price))+
+  geom_smooth(aes(x=review_scores_rating, y=price), formula = "y~x", method="lm", se=F)+
+  labs(title = "review scores against price", x="review scores rating",y="Price")
+```
+There is no such significant relationship between review scores rating and price, we choose to ignore this variable.
+
+### Distribution of log price
+```{r echo=FALSE}
+boston<-boston%>%mutate(log_price=log(price))
+ggplot(data=boston)+geom_histogram(mapping = aes(x=log_price),color="black",fill="steelblue",binwidth = 0.05)+labs(title = "Distribution of log price",x="log price",y="count")
+```
+
+## Part III: Models choices
+### Before narrow down to one room type
+```{r eval=FALSE,echo=TRUE}
+### Multilevel linear model with varying intercept
+boston_fit_1<-stan_lmer(price~bedrooms+accommodates+room_type+number_of_reviews+
+(1|neighbourhood_cleansed),data=model_boston)
+
+### Multilevel negative binomial model with varying intercept and slopes
+boston_fit_4<-stan_glmer(price~bedrooms+accommodates+room_type+
+(1+bedrooms+accommodates|neighbourhood_cleansed),
+data=model_boston,family = neg_binomial_2(link = "log"))
+```
+
+### After narrow down to one room type
+```{r eval=FALSE,echo=TRUE}
+### Multilevel negative binomial model with one varying slope and one varying intercpet
+boston_fit_entire_3<-stan_glmer(price~bedrooms+accommodates+
+(1+bedrooms|neighbourhood_cleansed),data=model_boston_entire,family = neg_binomial_2(link="log"))
+
+### Multilevel negative binomial model with two varying slope and one varying intercpet
+boston_fit_entire_4<-stan_glmer(price~bedrooms+accommodates+
+(1+bedrooms+accommodates|neighbourhood_cleansed),
+data=model_boston_entire,family = neg_binomial_2(link="log"))
+```
+
+
+
+
+
